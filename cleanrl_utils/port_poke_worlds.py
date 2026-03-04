@@ -13,6 +13,61 @@ from cleanrl_utils.buffers import ReplayBuffer
 from matplotlib import pyplot as plt
 
 
+class MaxLengthList:
+    def __init__(self, max_length):
+        self.max_length = max_length
+        self.data = []
+
+    def insert(self, item, index):
+        if index >= self.max_length:
+            raise IndexError(
+                f"Index {index} out of bounds for MaxLengthList with max_length {self.max_length}"
+            )
+        self.data.insert(index, item)
+        if len(self.data) > self.max_length:
+            self.data.pop(0)
+
+    def get_insert_index(self, item):
+        """
+        Get the index where the item should be inserted to preserve a descending sorted order
+        """
+        for i, existing_item in enumerate(self.data):
+            if item > existing_item:
+                return i
+        if len(self.data) < self.max_length:
+            return len(self.data)
+        return (
+            None  # item is not greater than any existing item and list is at max length
+        )
+
+    def do_item_insert(self, item):
+        index = self.get_insert_index(item)
+        if index is not None:
+            self.insert(item, index)
+            return index
+        return None
+
+
+def save_model(model_data, model_save_folder):
+    os.makedirs(model_save_folder, exist_ok=True)
+    model_save_path = os.path.join(model_save_folder, "model.pt")
+    torch.save(model_data, model_save_path)
+    print(f"model saved to {model_save_path}")
+
+
+def save_ranked_models(model_data_list, model_save_folder):
+    for i, model_data in enumerate(model_data_list):
+        save_model(model_data, os.path.join(model_save_folder, f"rank_{i+1}"))
+
+
+def save_all_models(final_model_data, model_data_list, model_save_folder):
+    if model_save_folder is None:
+        print(f"Warning: model_save_folder is None. Models will not be saved.")
+        return
+    save_model(final_model_data, os.path.join(model_save_folder, f"final"))
+    save_ranked_models(model_data_list, model_save_folder)
+
+
 def depathify(string):
     return (
         string.replace("/", "_")
@@ -334,9 +389,6 @@ class WorldModel(nn.Module):
     def reset(self):
         if self.load_path is not None and self.model is None:
             self.load()
-
-    def save(self):
-        pass  # We don't save here, but only in train_world_model.py
 
     def iterative_save(self):
         pass
