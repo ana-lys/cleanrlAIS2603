@@ -338,6 +338,9 @@ class WorldModel(nn.Module):
     def save(self):
         pass  # We don't save here, but only in train_world_model.py
 
+    def iterative_save(self):
+        pass
+
     def load(self):
         self.create_model(
             action_dim=get_pokeworlds_n_actions()
