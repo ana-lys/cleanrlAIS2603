@@ -381,6 +381,28 @@ class EmbedBuffer:
         self.buffer = None
         self.reset()
 
+    def get_unseen_elements(self, embeddings, buffer=None):
+        if buffer is None:
+            buffer = self.buffer
+        if buffer is None:
+            return embeddings
+        # embedding shape: (n_frames, embedding_dim)
+        # buffer shape: (buffer_size, embedding_dim)
+        diffs = embeddings.unsqueeze(1) - buffer.unsqueeze(0)
+        new_embeddings = []
+        for i in range(embeddings.shape[0]):
+            max_dimension_diff = (
+                diffs[i].abs().max(-1).values
+            )  # max absolute difference across dimensions for each buffer element
+            has_element_too_close = (
+                max_dimension_diff.min().item() < 0.001
+            )  # if any buffer element is too close in any dimension, we consider it already in the buffer
+            if not has_element_too_close:
+                new_embeddings.append(embeddings[i])
+        if len(new_embeddings) == 0:
+            return None
+        return torch.stack(new_embeddings)
+
     def iterative_save(self):
         if self.save_path is not None and self.buffer is not None:
             os.makedirs(self.save_path, exist_ok=True)
@@ -389,7 +411,14 @@ class EmbedBuffer:
                 existing_buffer = torch.load(self.save_path + "/embed_buffer.pt").to(
                     next(self.embedder.parameters()).device
                 )
-                merged_buffer = torch.cat([existing_buffer, self.buffer], dim=0)
+                existing_buffer = self.get_unseen_elements(existing_buffer)
+                if existing_buffer is not None:
+                    merged_buffer = torch.cat([existing_buffer, self.buffer], dim=0)
+                else:
+                    print(
+                        f"All current buffer entries are already in the existing buffer. Not merging."
+                    )
+                    merged_buffer = self.buffer
                 save_size = merged_buffer.shape[0]
                 torch.save(merged_buffer.cpu(), self.save_path + "/embed_buffer.pt")
             else:
@@ -420,20 +449,9 @@ class EmbedBuffer:
             else:
                 new_embedding = self.embedder.embed(items)
             # check if new_embeddings is already in the buffer. and if it is, skip adding:
-            diffs = new_embedding.unsqueeze(1) - self.buffer.unsqueeze(0)
-            save_embeddings = []
-            for i in range(new_embedding.shape[0]):
-                max_dimension_diff = (
-                    diffs[i].abs().max(-1).values
-                )  # max absolute difference across dimensions for each buffer element
-                has_element_too_close = (
-                    max_dimension_diff.min().item() < 0.001
-                )  # if any buffer element is too close in any dimension, we consider it already in the buffer
-                if not has_element_too_close:
-                    save_embeddings.append(new_embedding[i])
-            if len(save_embeddings) == 0:
+            new_embedding = self.get_unseen_elements(new_embedding)
+            if new_embedding is None:
                 return
-            new_embedding = torch.stack(save_embeddings)  # TODO: Check shapes
             self.buffer = torch.cat([self.buffer, new_embedding], dim=0)
             if self.buffer.shape[0] > self.max_size:
                 self.rationalize_buffer()
