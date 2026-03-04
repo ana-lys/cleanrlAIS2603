@@ -26,7 +26,7 @@ def parse_args():
                         help="the path to the saved model (e.g., ./dqn_atari_model.pth)")
     parser.add_argument("--env-id", type=str, default="BreakoutNoFrameskip-v4",
         help="the id of the environment")
-    parser.add_argument("--eval-episodes", type=int, default=10,
+    parser.add_argument("--eval-episodes", type=int, default=3,
         help="the number of evaluation episodes")
     parser.add_argument("--curiosity_module", type=str, default="embedbuffer",
                     help="the type of curiosity module to use.")

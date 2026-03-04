@@ -2,6 +2,7 @@ from typing import Callable
 
 import gymnasium as gym
 import torch
+import os
 
 
 def evaluate(
@@ -16,43 +17,47 @@ def evaluate(
     gamma: float = 0.99,
     args=None,
 ):
-    envs = gym.vector.SyncVectorEnv(
-        [make_env(env_id, 0, capture_video, run_name, gamma)],
-        autoreset_mode=gym.vector.AutoresetMode.SAME_STEP,
-    )
-    agent = Model(envs).to(device)
-    agent.load_state_dict(torch.load(model_path, map_location=device))
-    agent.eval()
-
-    obs, _ = envs.reset()
-    episodic_returns = []
-    curiosity_rewards = []
-    while len(episodic_returns) < eval_episodes:
-        actions, _, _, _ = agent.get_action_and_value(torch.Tensor(obs).to(device))
-        next_obs, rewards, terminations, truncations, infos = envs.step(
-            actions.cpu().numpy()
+    models = os.listdir(model_path)
+    for model in models:
+        print(f"evaluating model {model}...")
+        full_model_path = os.path.join(model_path, model, "model.pt")
+        envs = gym.vector.SyncVectorEnv(
+            [make_env(env_id, 0, capture_video, run_name, gamma)],
+            autoreset_mode=gym.vector.AutoresetMode.SAME_STEP,
         )
-        curiosity_reward = args.curiosity_module.get_reward(
-            obs, actions, next_obs, infos
-        )
-        rewards[0] = rewards[0] + curiosity_reward
-        curiosity_rewards.append(curiosity_reward)
-        if "final_info" in infos:
-            if isinstance(infos["final_info"], dict):
-                infos["final_info"] = [infos["final_info"]]
-            for info in infos["final_info"]:
-                if "episode" not in info:
-                    continue
-                print(
-                    f"eval_episode={len(episodic_returns)}, episodic_return={info['episode']['r']}, curiosity_reward={sum(curiosity_rewards)}"
-                )
-                episodic_returns += [info["episode"]["r"]]
-            args.curiosity_module.iterative_save()
-            args.curiosity_module.reset()
-            curiosity_rewards = []
-        obs = next_obs
+        agent = Model(envs).to(device)
+        agent.load_state_dict(torch.load(full_model_path, map_location=device))
+        agent.eval()
 
-    return episodic_returns
+        obs, _ = envs.reset()
+        episodic_returns = []
+        curiosity_rewards = []
+        while len(episodic_returns) < eval_episodes:
+            actions, _, _, _ = agent.get_action_and_value(torch.Tensor(obs).to(device))
+            next_obs, rewards, terminations, truncations, infos = envs.step(
+                actions.cpu().numpy()
+            )
+            curiosity_reward = args.curiosity_module.get_reward(
+                obs, actions, next_obs, infos
+            )
+            rewards[0] = rewards[0] + curiosity_reward
+            curiosity_rewards.append(curiosity_reward)
+            if "final_info" in infos:
+                if isinstance(infos["final_info"], dict):
+                    infos["final_info"] = [infos["final_info"]]
+                for info in infos["final_info"]:
+                    if "episode" not in info:
+                        continue
+                    print(
+                        f"eval_episode={len(episodic_returns)}, episodic_return={info['episode']['r']}, curiosity_reward={sum(curiosity_rewards)}"
+                    )
+                    episodic_returns += [info["episode"]["r"]]
+                args.curiosity_module.iterative_save()
+                args.curiosity_module.reset()
+                curiosity_rewards = []
+            obs = next_obs
+
+        return
 
 
 if __name__ == "__main__":
