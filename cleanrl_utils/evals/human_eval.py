@@ -4,7 +4,10 @@ from typing import Callable
 import gymnasium as gym
 import numpy as np
 import torch
-from cleanrl_utils.port_poke_worlds import plot_observation, OneOfToDiscreteWrapper
+from cleanrl.cleanrl_utils.port_gameboy_worlds import (
+    plot_observation,
+    OneOfToDiscreteWrapper,
+)
 
 
 def evaluate(

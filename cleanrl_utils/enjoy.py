@@ -5,7 +5,7 @@ import numpy as np
 from huggingface_hub import hf_hub_download
 
 from cleanrl_utils.evals import MODELS
-from cleanrl_utils.port_poke_worlds import get_curiosity_module
+from cleanrl.cleanrl_utils.port_gameboy_worlds import get_curiosity_module
 
 
 def parse_args():

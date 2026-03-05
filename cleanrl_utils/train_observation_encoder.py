@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 import tyro
 from tqdm import tqdm
 
-from cleanrl_utils.port_poke_worlds import (
+from cleanrl.cleanrl_utils.port_gameboy_worlds import (
     WorldModel,
     get_pokeworlds_n_actions,
     CNNEmbedder,
