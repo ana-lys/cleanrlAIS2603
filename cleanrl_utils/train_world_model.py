@@ -265,7 +265,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(
         world_model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
     )
-    run_name = f"{args.exp_name}_{args.buffer_save_path}_{int(time.time())}"
+    run_name = f"{args.exp_name}_{args.buffer_save_path.replace('/', '--').replace('\\', '--')}_{int(time.time())}"
     if args.track:
         import wandb
 

@@ -245,13 +245,16 @@ class PatchProjection(nn.Module):
         return vector
 
     def embed(self, items: List[np.ndarray]) -> torch.Tensor:
-        if not isinstance(items, torch.Tensor):
-            batch_tensor = torch.tensor(
-                items.reshape(-1, 1, 144, 160),
+        with torch.no_grad():
+            if not isinstance(items, torch.Tensor):
+                batch_tensor = torch.tensor(
+                    items.reshape(-1, 1, 144, 160),
+                )
+            batch_tensor = batch_tensor.to(self.dtype).to(
+                next(self.parameters()).device
             )
-        batch_tensor = batch_tensor.to(self.dtype).to(next(self.parameters()).device)
-        embeddings = self(batch_tensor)
-        return embeddings
+            embeddings = self(batch_tensor)
+            return embeddings
 
     def train(self, **kwargs):
         pass
@@ -281,18 +284,38 @@ def get_gameboy_cnn_chain():
     )
 
 
+def invert_gameboy_cnn_chain():
+    return nn.Sequential(
+        nn.Unflatten(1, (64, 1, 2)),
+        nn.ReLU(),
+        nn.ConvTranspose2d(64, 64, kernel_size=3, stride=1),
+        nn.ReLU(),
+        nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2),
+        nn.ReLU(),
+        nn.ConvTranspose2d(32, 4, kernel_size=16, stride=16),
+    )
+
+
 class CNNEmbedder(nn.Module):
     def __init__(self, hidden_dim=720, normalized_observations=True):
         super().__init__()
-        self.cnn = nn.Sequential(
+        self.norm1 = nn.BatchNorm2d(1, affine=False)
+        self.internal_norm = nn.BatchNorm1d(hidden_dim)
+        self.norm2 = nn.BatchNorm2d(1, affine=False)
+        self.encoder = nn.Sequential(
             *get_gameboy_cnn_chain(),
             nn.Sigmoid(),
+            self.internal_norm,
+        )
+        self.decoder = nn.Sequential(
+            *invert_gameboy_cnn_chain(),
         )
         self.output_dim = hidden_dim
         self.normalized_observations = normalized_observations
 
-    def forward(self, x):
-        raw = self.cnn(x)
+    def do_embed(self, x):
+        normed = self.norm1(x)
+        raw = self.encoder(normed)
         if self.normalized_observations:
             normalized = nn.functional.normalize(
                 raw, dim=-1
@@ -300,17 +323,26 @@ class CNNEmbedder(nn.Module):
             return normalized
         return raw
 
-    def embed(self, items: List[np.ndarray]) -> torch.Tensor:
-        batch_tensor = torch.tensor(
-            items.reshape(-1, 1, 144, 160),
-            dtype=torch.float32,
-            device=next(self.parameters()).device,
-        )
-        embeddings = self(batch_tensor)
-        return embeddings
+    def forward(self, x):
+        embedding = self.do_embed(x)
+        unembed = self.decoder(embedding)
+        normed = self.norm2(unembed)
+        return normed
 
-    def train(self, **kwargs):
-        raise NotImplementedError
+    def embed(self, items: List[np.ndarray]) -> torch.Tensor:
+        with torch.no_grad():
+            batch_tensor = torch.tensor(
+                items.reshape(-1, 1, 144, 160),
+                dtype=torch.float32,
+                device=next(self.parameters()).device,
+            )
+            embeddings = self.do_embed(batch_tensor)
+            return embeddings
+
+    def load(self, path):
+        loaded_state = torch.load(path)
+        self.load_state_dict(loaded_state)
+        print(f"Loaded CNN embedder from {path}")
 
 
 class WorldModel(nn.Module):
@@ -637,11 +669,14 @@ def get_curiosity_module(args):
     if args.observation_embedder == "random_patch":
         embedder = PatchProjection(
             normalized_observations=args.similarity_metric == "cosine"
-        )
+        ).eval()
+
     elif args.observation_embedder == "cnn":
         embedder = CNNEmbedder(
             normalized_observations=args.similarity_metric == "cosine"
-        )
+        ).eval()
+        if args.embedder_load_path is not None:
+            embedder.load(args.embedder_load_path)
     if "buffer" in args.curiosity_module:
         if args.curiosity_module == "embedbuffer":
             module = EmbedBuffer(

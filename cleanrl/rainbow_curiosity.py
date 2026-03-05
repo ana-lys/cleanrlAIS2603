@@ -485,9 +485,9 @@ if __name__ == "__main__":
         ],
         autoreset_mode=gym.vector.AutoresetMode.SAME_STEP,
     )
-    assert isinstance(
-        envs.single_action_space, gym.spaces.Discrete
-    ), "only discrete action space is supported"
+    assert isinstance(envs.single_action_space, gym.spaces.Discrete), (
+        "only discrete action space is supported"
+    )
 
     q_network = NoisyDuelingDistributionalNetwork(
         envs, args.n_atoms, args.v_min, args.v_max
@@ -564,6 +564,11 @@ if __name__ == "__main__":
                     )
                     writer.add_scalar(
                         "charts/episodic_length", info["episode"]["l"], global_step
+                    )
+                    writer.add_scalar(
+                        "charts/completion_percentage",
+                        int(100 * global_step / args.total_timesteps),
+                        global_step,
                     )
 
         # TRY NOT TO MODIFY: save data to reply buffer; handle `final_observation`
@@ -653,11 +658,6 @@ if __name__ == "__main__":
                     print("SPS:", sps)
                     writer.add_scalar("charts/SPS", sps, global_step)
                     writer.add_scalar("charts/beta", rb.beta, global_step)
-                    writer.add_scalar(
-                        "charts/completion_percentage",
-                        global_step / args.total_timesteps,
-                        global_step,
-                    )
 
                 # optimize the model
                 optimizer.zero_grad()

@@ -327,6 +327,11 @@ if __name__ == "__main__":
                         writer.add_scalar(
                             "charts/episodic_length", info["episode"]["l"], global_step
                         )
+                        writer.add_scalar(
+                            "charts/completion_percentage",
+                            int(100 * global_step / args.total_timesteps),
+                            global_step,
+                        )
 
         # bootstrap value if not done
         with torch.no_grad():
@@ -436,11 +441,6 @@ if __name__ == "__main__":
         print("SPS:", int(global_step / (time.time() - start_time)))
         writer.add_scalar(
             "charts/SPS", int(global_step / (time.time() - start_time)), global_step
-        )
-        writer.add_scalar(
-            "charts/completion_percentage",
-            global_step / args.total_timesteps,
-            global_step,
         )
 
     envs.close()

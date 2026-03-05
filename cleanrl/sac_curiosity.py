@@ -336,6 +336,11 @@ if __name__ == "__main__":
                 writer.add_scalar(
                     "charts/episodic_length", info["episode"]["l"], global_step
                 )
+                writer.add_scalar(
+                    "charts/completion_percentage",
+                    int(100 * global_step / args.total_timesteps),
+                    global_step,
+                )
                 break
 
         # TRY NOT TO MODIFY: save data to reply buffer; handle `final_observation`
@@ -424,11 +429,6 @@ if __name__ == "__main__":
                     )
 
             if global_step % 100 == 0:
-                writer.add_scalar(
-                    "charts/completion_percentage",
-                    global_step / args.total_timesteps,
-                    global_step,
-                )
                 writer.add_scalar(
                     "losses/qf1_values", qf1_a_values.mean().item(), global_step
                 )
