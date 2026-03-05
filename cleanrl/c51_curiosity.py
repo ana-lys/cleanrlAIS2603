@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import gymnasium as gym
 import ale_py
+import copy
 import numpy as np
 import torch
 import torch.nn as nn
@@ -52,7 +53,7 @@ class Args:
     """whether to save model into the `runs/{run_name}` folder"""
     model_save_path: str | None = None
     """custom path to save the model """
-    model_save_ranks: int | None = 10
+    model_save_ranks: int | None = 3
     """ will save the final model as well as the `model_save_ranks` top models during training according to episodic return. Only applicable if `save_model` is True."""
     upload_model: bool = False
     """whether to upload the saved model to huggingface"""
@@ -184,7 +185,7 @@ has_warned = False
 
 def get_model_save_data(args, q_network):
     model_data = {
-        "model_weights": q_network.state_dict(),
+        "model_weights": copy.deepcopy(q_network.state_dict()),
         "args": vars(args),
     }
     return model_data
