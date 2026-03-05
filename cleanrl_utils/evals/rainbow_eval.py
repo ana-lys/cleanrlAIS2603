@@ -27,9 +27,9 @@ def evaluate(
             autoreset_mode=gym.vector.AutoresetMode.SAME_STEP,
         )
         model_data = torch.load(full_model_path, map_location="cpu")
-        args = Namespace(**model_data["args"])
+        m_args = Namespace(**model_data["args"])
         model = Model(
-            envs, n_atoms=args.n_atoms, v_min=args.v_min, v_max=args.v_max
+            envs, n_atoms=m_args.n_atoms, v_min=m_args.v_min, v_max=m_args.v_max
         ).to(device)
         model.load_state_dict(model_data["model_weights"])
         model.eval()

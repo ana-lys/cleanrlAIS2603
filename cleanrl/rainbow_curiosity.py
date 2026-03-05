@@ -430,6 +430,9 @@ class PrioritizedReplayBuffer:
             self.sum_tree.update(idx, priority)
             self.min_tree.update(idx, priority)
 
+    def save(self, save_folder, exp_name):
+        return
+
 
 def get_model_save_data(args, q_network):
     model_data = {
@@ -482,9 +485,9 @@ if __name__ == "__main__":
         ],
         autoreset_mode=gym.vector.AutoresetMode.SAME_STEP,
     )
-    assert isinstance(envs.single_action_space, gym.spaces.Discrete), (
-        "only discrete action space is supported"
-    )
+    assert isinstance(
+        envs.single_action_space, gym.spaces.Discrete
+    ), "only discrete action space is supported"
 
     q_network = NoisyDuelingDistributionalNetwork(
         envs, args.n_atoms, args.v_min, args.v_max
