@@ -1,4 +1,5 @@
 # docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/sac/#sac_ataripy
+import copy
 import os
 import random
 import time
@@ -27,6 +28,8 @@ from cleanrl_utils.port_poke_worlds import (
     get_curiosity_module,
     get_gameboy_cnn_chain,
     PokemonReplayBuffer as ReplayBuffer,
+    save_all_models,
+    MaxLengthList,
 )
 
 
@@ -52,6 +55,8 @@ class Args:
     """whether to save model into the `runs/{run_name}` folder"""
     model_save_path: str | None = None
     """custom path to save the model (overrides default `runs/{run_name}/{exp_name}.cleanrl_model`)"""
+    model_save_ranks: int | None = 3
+    """ will save the final model as well as the `model_save_ranks` top models during training according to episodic return. Only applicable if `save_model` is True."""
 
     # Algorithm specific arguments
     env_id: str = "BeamRiderNoFrameskip-v4"
@@ -194,6 +199,10 @@ class Actor(nn.Module):
         return action, log_prob, action_probs
 
 
+def get_model_save_data(actor):
+    return copy.deepcopy(actor.state_dict())
+
+
 if __name__ == "__main__":
     args = tyro.cli(Args)
     args.exp_name = depathify(args.exp_name)
@@ -233,9 +242,9 @@ if __name__ == "__main__":
         [make_env(args.env_id, args.seed, 0, args.capture_video, run_name)],
         autoreset_mode=gym.vector.AutoresetMode.SAME_STEP,
     )
-    assert isinstance(
-        envs.single_action_space, gym.spaces.Discrete
-    ), "only discrete action space is supported"
+    assert isinstance(envs.single_action_space, gym.spaces.Discrete), (
+        "only discrete action space is supported"
+    )
 
     actor = Actor(envs).to(device)
     qf1 = SoftQNetwork(envs).to(device)
@@ -269,6 +278,10 @@ if __name__ == "__main__":
         handle_timeout_termination=False,
     )
     curiosity_module = get_curiosity_module(args)
+    model_data_list = MaxLengthList(args.model_save_ranks) if args.save_model else None
+    model_reward_list = (
+        MaxLengthList(args.model_save_ranks) if args.save_model else None
+    )
     episode_rewards = []
 
     start_time = time.time()
@@ -294,6 +307,11 @@ if __name__ == "__main__":
             if args.reset_curiosity_module:
                 curiosity_module.reset()  # reset the curiosity module at the end of each episode if the flag is set
             this_episode_reward = sum(episode_rewards)
+            if args.save_model:
+                insert_index = model_reward_list.do_item_insert(this_episode_reward)
+                if insert_index is not None:
+                    model_data = get_model_save_data(actor)
+                    model_data_list.insert_item(insert_index, model_data)
             episode_rewards = []
         else:
             rewards[0] = rewards[0] + curiosity_module.get_reward(
@@ -438,16 +456,12 @@ if __name__ == "__main__":
     writer.close()
 
     if args.save_model:
-        model_path = (
-            args.model_save_path
-            if args.model_save_path
-            else f"runs/{run_name}/{args.exp_name}.cleanrl_model"
+        final_model_data = get_model_save_data(actor)
+        save_all_models(
+            final_model_data=final_model_data,
+            model_data_list=model_data_list,
+            model_save_folder=args.model_save_path,
         )
-        if not model_path.endswith(".pt"):
-            model_path = os.path.join(model_path, "model.pt")
-        os.makedirs(os.path.dirname(model_path), exist_ok=True)
-        torch.save(actor.state_dict(), model_path)
-        print(f"model saved to {model_path}")
 
     if args.capture_video:
         video_candidates = [

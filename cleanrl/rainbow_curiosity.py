@@ -1,5 +1,6 @@
 # docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/rainbow/#rainbow_ataripy
 import collections
+import copy
 import math
 import os
 import random
@@ -29,6 +30,8 @@ from cleanrl_utils.port_poke_worlds import (
     get_curiosity_module,
     get_gameboy_cnn_chain,
     PokemonReplayBuffer as ReplayBuffer,
+    save_all_models,
+    MaxLengthList,
 )
 
 
@@ -54,6 +57,8 @@ class Args:
     """whether to save model into the `runs/{run_name}` folder"""
     model_save_path: str | None = None
     """custom path to save the model (overrides default `runs/{run_name}/{exp_name}.cleanrl_model`)"""
+    model_save_ranks: int | None = 3
+    """ will save the final model as well as the `model_save_ranks` top models during training according to episodic return. Only applicable if `save_model` is True."""
     upload_model: bool = False
     """whether to upload the saved model to huggingface"""
     hf_entity: str = ""
@@ -426,6 +431,14 @@ class PrioritizedReplayBuffer:
             self.min_tree.update(idx, priority)
 
 
+def get_model_save_data(args, q_network):
+    model_data = {
+        "model_weights": copy.deepcopy(q_network.state_dict()),
+        "args": vars(args),
+    }
+    return model_data
+
+
 if __name__ == "__main__":
     args = tyro.cli(Args)
     args.exp_name = depathify(args.exp_name)
@@ -493,6 +506,10 @@ if __name__ == "__main__":
         args.prioritized_replay_eps,
     )
     curiosity_module = get_curiosity_module(args)
+    model_data_list = MaxLengthList(args.model_save_ranks) if args.save_model else None
+    model_reward_list = (
+        MaxLengthList(args.model_save_ranks) if args.save_model else None
+    )
 
     start_time = time.time()
     episode_rewards = []
@@ -517,6 +534,11 @@ if __name__ == "__main__":
         next_obs, rewards, terminations, truncations, infos = envs.step(actions)
         if "final_info" in infos:
             this_episode_reward = sum(episode_rewards)
+            if args.save_model:
+                insert_index = model_reward_list.do_item_insert(this_episode_reward)
+                if insert_index is not None:
+                    model_data = get_model_save_data(args, q_network)
+                    model_data_list.insert_item(insert_index, model_data)
             episode_rewards = []
             if args.reset_curiosity_module:
                 curiosity_module.reset()  # reset the curiosity module at the end of each episode if the flag is set
@@ -653,20 +675,12 @@ if __name__ == "__main__":
     writer.close()
 
     if args.save_model:
-        model_path = (
-            args.model_save_path
-            if args.model_save_path
-            else f"runs/{run_name}/{args.exp_name}.cleanrl_model"
+        final_model_data = get_model_save_data(args, q_network)
+        save_all_models(
+            final_model_data=final_model_data,
+            model_data_list=model_data_list,
+            model_save_folder=args.model_save_path,
         )
-        if not model_path.endswith(".pt"):
-            model_path = os.path.join(model_path, "model.pt")
-        os.makedirs(os.path.dirname(model_path), exist_ok=True)
-        model_data = {
-            "model_weights": q_network.state_dict(),
-            "args": vars(args),
-        }
-        torch.save(model_data, model_path)
-        print(f"model saved to {model_path}")
 
     if args.capture_video:
         video_candidates = [
