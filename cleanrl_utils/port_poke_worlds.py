@@ -78,7 +78,7 @@ def depathify(string):
     )
 
 
-FRAME_STACK = 4
+FRAME_STACK = 2
 
 
 class OneOfToDiscreteWrapper(gym.ActionWrapper):
