@@ -289,7 +289,7 @@ if __name__ == "__main__":
     for epoch in tqdm(range(args.num_epochs), desc="Training world model"):
         train_losses = []
         for X_batch, y_batch in tqdm(
-            train_dataloader, desc="Epoch {epoch} - Training", leave=False
+            train_dataloader, desc=f"Epoch {epoch} - Training", leave=False
         ):
             optimizer.zero_grad()
             pred_next_obs = world_model(X_batch)

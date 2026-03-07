@@ -199,7 +199,7 @@ if __name__ == "__main__":
     for epoch in tqdm(range(args.num_epochs), desc="Training observation encoder"):
         train_losses = []
         for X_batch in tqdm(
-            train_dataloader, desc="Epoch {epoch} - Training", leave=False
+            train_dataloader, desc=f"Epoch {epoch} - Training", leave=False
         ):
             optimizer.zero_grad()
             pred_next_obs = observation_embedder(X_batch)
