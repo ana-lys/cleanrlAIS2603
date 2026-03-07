@@ -263,10 +263,11 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
-def get_gameboy_cnn_chain():
+def get_gameboy_cnn_chain(stacked=True):
+    use_stack = FRAME_STACK if stacked else 1
     return nn.Sequential(
         layer_init(
-            nn.Conv2d(4, 32, kernel_size=16, stride=16)
+            nn.Conv2d(use_stack, 32, kernel_size=16, stride=16)
         ),  # (batch_size, 32, 9, 10)
         nn.ReLU(),
         layer_init(
@@ -281,7 +282,8 @@ def get_gameboy_cnn_chain():
     )
 
 
-def invert_gameboy_cnn_chain():
+def invert_gameboy_cnn_chain(stacked=True):
+    use_stack = FRAME_STACK if stacked else 1
     return nn.Sequential(
         nn.Unflatten(1, (64, 1, 2)),
         nn.ReLU(),
@@ -289,7 +291,7 @@ def invert_gameboy_cnn_chain():
         nn.ReLU(),
         nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2),
         nn.ReLU(),
-        nn.ConvTranspose2d(32, 4, kernel_size=16, stride=16),
+        nn.ConvTranspose2d(32, use_stack, kernel_size=16, stride=16),
     )
 
 
@@ -300,12 +302,12 @@ class CNNEmbedder(nn.Module):
         self.internal_norm = nn.BatchNorm1d(hidden_dim)
         self.norm2 = nn.BatchNorm2d(1, affine=False)
         self.encoder = nn.Sequential(
-            *get_gameboy_cnn_chain(),
+            *get_gameboy_cnn_chain(stacked=False),
             nn.Sigmoid(),
             self.internal_norm,
         )
         self.decoder = nn.Sequential(
-            *invert_gameboy_cnn_chain(),
+            *invert_gameboy_cnn_chain(stacked=False),
         )
         self.output_dim = hidden_dim
         self.normalized_observations = normalized_observations
