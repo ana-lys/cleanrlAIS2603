@@ -295,7 +295,7 @@ if __name__ == "__main__":
                 insert_index = model_reward_list.do_item_insert(this_episode_reward)
                 if insert_index is not None:
                     model_data = get_model_save_data(args, q_network)
-                    model_data_list.insert_item(insert_index, model_data)
+                    model_data_list.insert(insert_index, model_data)
             episode_rewards = []
             if args.reset_curiosity_module:
                 curiosity_module.reset()  # reset the curiosity module at the end of each episode if the flag is set

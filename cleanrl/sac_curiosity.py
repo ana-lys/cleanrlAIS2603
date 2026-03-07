@@ -311,7 +311,7 @@ if __name__ == "__main__":
                 insert_index = model_reward_list.do_item_insert(this_episode_reward)
                 if insert_index is not None:
                     model_data = get_model_save_data(actor)
-                    model_data_list.insert_item(insert_index, model_data)
+                    model_data_list.insert(insert_index, model_data)
             episode_rewards = []
         else:
             rewards[0] = rewards[0] + curiosity_module.get_reward(
