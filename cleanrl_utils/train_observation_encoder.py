@@ -1,5 +1,6 @@
 import os
 import random
+import shutil
 import time
 from dataclasses import dataclass
 from torch.utils.data import Dataset, DataLoader
@@ -126,7 +127,7 @@ class ObservationDataset(Dataset):
         return self.total_length
 
     def close(self):
-        os.remove(os.path.join(self.replay_buffer_folder, "processed_observations"))
+        shutil.rmtree(os.path.join(self.replay_buffer_folder, "processed_observations"))
 
     def save_meta(self, save_path):
         os.makedirs(save_path, exist_ok=True)
