@@ -298,24 +298,31 @@ def invert_gameboy_cnn_chain(stacked=True):
         nn.ReLU(),
         nn.ConvTranspose2d(64, 64, kernel_size=3, stride=1),
         nn.ReLU(),
-        nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2),
+        nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, output_padding=(1, 0)),
         nn.ReLU(),
         nn.ConvTranspose2d(32, use_stack, kernel_size=16, stride=16),
     )
 
 
 class CNNEmbedder(nn.Module):
-    def __init__(self, hidden_dim=720, normalized_observations=True):
+    def __init__(self, hidden_dim=128, normalized_observations=True):
         super().__init__()
         self.norm1 = nn.BatchNorm2d(1, affine=False)
         self.internal_norm = nn.BatchNorm1d(hidden_dim)
         self.norm2 = nn.BatchNorm2d(1, affine=False)
+        encoder_cnn_chain = get_gameboy_cnn_chain(stacked=False)
+        dummy_input = torch.zeros(1, 1, 144, 160)
+        with torch.no_grad():
+            dummy_output = encoder_cnn_chain(dummy_input)
+        chain_dim = dummy_output.shape[1]
         self.encoder = nn.Sequential(
             *get_gameboy_cnn_chain(stacked=False),
+            layer_init(nn.Linear(chain_dim, hidden_dim)),
             nn.Sigmoid(),
             self.internal_norm,
         )
         self.decoder = nn.Sequential(
+            layer_init(nn.Linear(hidden_dim, chain_dim)),
             *invert_gameboy_cnn_chain(stacked=False),
         )
         self.output_dim = hidden_dim

@@ -82,15 +82,21 @@ class ObservationDataset(Dataset):
         buffer_lengths = []
         n = 0
         for i, observation_file in tqdm(
-            enumerate(observation_files), desc="Preprocessing buffers"
+            enumerate(observation_files),
+            desc="Preprocessing buffers",
+            total=len(observation_files),
         ):
             observations = np.load(observation_file, mmap_mode="r")
             X = []
-            for i in range(len(observations)):
-                obs = observations[i][
+            for j in range(len(observations)):
+                obs = observations[j, 0][
                     -1
                 ]  # Get the most recent frame from the obs stack. Assumes a single env.
-                X_vec = torch.tensor(obs, dtype=torch.float16).reshape(-1).to("cpu")
+                X_vec = (
+                    torch.tensor(obs, dtype=torch.float16)
+                    .reshape(1, 144, 160)
+                    .to("cpu")
+                )
                 X.append(X_vec)
             X = torch.stack(X).cpu()
             torch.save(X, buffer_path + f"/X_{i}.pt")
@@ -201,6 +207,7 @@ if __name__ == "__main__":
         for X_batch in tqdm(
             train_dataloader, desc=f"Epoch {epoch} - Training", leave=False
         ):
+            X_batch = X_batch.to(next(observation_embedder.parameters()).dtype)
             optimizer.zero_grad()
             pred_next_obs = observation_embedder(X_batch)
             with torch.no_grad():
@@ -214,8 +221,9 @@ if __name__ == "__main__":
         val_losses = []
         with torch.no_grad():
             for X_batch in tqdm(
-                val_dataloader, desc="Epoch {epoch} - Validation", leave=False
+                val_dataloader, desc=f"Epoch {epoch} - Validation", leave=False
             ):
+                X_batch = X_batch.to(next(observation_embedder.parameters()).dtype)
                 pred_next_obs = observation_embedder(X_batch)
                 y = observation_embedder.norm1(X_batch)
                 loss = F.mse_loss(pred_next_obs, y)

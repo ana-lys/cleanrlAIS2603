@@ -302,7 +302,7 @@ if __name__ == "__main__":
         val_losses = []
         with torch.no_grad():
             for X_batch, y_batch in tqdm(
-                val_dataloader, desc="Epoch {epoch} - Validation", leave=False
+                val_dataloader, desc=f"Epoch {epoch} - Validation", leave=False
             ):
                 pred_next_obs = world_model(X_batch)
                 loss = F.mse_loss(pred_next_obs, y_batch)
