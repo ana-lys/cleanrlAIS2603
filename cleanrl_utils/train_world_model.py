@@ -21,7 +21,7 @@ from torch.utils.tensorboard import SummaryWriter
 import tyro
 from tqdm import tqdm
 
-from cleanrl.cleanrl_utils.port_gameboy_worlds import (
+from cleanrl_utils.port_gameboy_worlds import (
     WorldModel,
     get_pokeworlds_n_actions,
     PatchProjection,

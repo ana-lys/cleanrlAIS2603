@@ -4,7 +4,7 @@ from typing import Callable
 import gymnasium as gym
 import numpy as np
 import torch
-from cleanrl.cleanrl_utils.port_gameboy_worlds import (
+from cleanrl_utils.port_gameboy_worlds import (
     plot_observation,
     OneOfToDiscreteWrapper,
 )

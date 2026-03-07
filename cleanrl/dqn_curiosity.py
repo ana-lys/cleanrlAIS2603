@@ -22,7 +22,7 @@ from cleanrl_utils.atari_wrappers import (
     MaxAndSkipEnv,
     NoopResetEnv,
 )
-from cleanrl.cleanrl_utils.port_gameboy_worlds import (
+from cleanrl_utils.port_gameboy_worlds import (
     depathify,
     get_curiosity_module,
     get_gameboy_cnn_chain,
@@ -112,7 +112,7 @@ class Args:
 
 def make_env(env_id, seed, idx, capture_video, run_name, gamma=0.99):
     if env_id.startswith("poke_worlds"):
-        from cleanrl.cleanrl_utils.port_gameboy_worlds import poke_worlds_make_env
+        from cleanrl_utils.port_gameboy_worlds import poke_worlds_make_env
 
         return poke_worlds_make_env(
             env_id, seed, idx, capture_video, run_name, gamma=gamma
