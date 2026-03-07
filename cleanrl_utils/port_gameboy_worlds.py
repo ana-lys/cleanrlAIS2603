@@ -47,6 +47,15 @@ class MaxLengthList:
             return index
         return None
 
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index]
+
+    def __iter__(self):
+        return iter(self.data)
+
 
 def save_model(model_data, model_save_folder):
     os.makedirs(model_save_folder, exist_ok=True)
