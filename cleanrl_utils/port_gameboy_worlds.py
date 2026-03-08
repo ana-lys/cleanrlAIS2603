@@ -807,9 +807,9 @@ class PokemonReplayBuffer(ReplayBuffer):
 def stacked_frame_to_single(observation):
     # observation shape is (4, 144, 160)
     # We want to convert it to a (144 x 4, 160) image where each of the 4 frames is stacked vertically. This is just for visualization purposes.
-    all_obs = observation.reshape(4, 144, 160)
-    show_obs = np.zeros((144 * 4, 160), dtype=np.uint8)
-    for i in range(4):
+    all_obs = observation.reshape(FRAME_STACK, 144, 160)
+    show_obs = np.zeros((144 * FRAME_STACK, 160), dtype=np.uint8)
+    for i in range(FRAME_STACK):
         show_obs[i * 144 : (i + 1) * 144] = all_obs[i]
     return show_obs
 
