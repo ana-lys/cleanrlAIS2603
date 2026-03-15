@@ -16,15 +16,17 @@ from torch.utils.tensorboard import SummaryWriter
 
 @dataclass
 class Args:
+    tag: str = "v2"
+     
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
     """the name of this experiment"""
-    seed: int = 1
+    seed: int = 99
     """seed of the experiment"""
     torch_deterministic: bool = True
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
     cuda: bool = True
     """if toggled, cuda will be enabled by default"""
-    track: bool = False
+    track: bool = True
     """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "cleanRL"
     """the wandb's project name"""
@@ -34,15 +36,17 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
+    # env_id: str = "LunarLander-v3"
     env_id: str = "CartPole-v1"
+    
     """the id of the environment"""
-    total_timesteps: int = 500000
+    total_timesteps: int = 5000000
     """total timesteps of the experiments"""
-    learning_rate: float = 2.5e-4
+    learning_rate: float = 5.0e-4
     """the learning rate of the optimizer"""
-    num_envs: int = 4
+    num_envs: int = 1024
     """the number of parallel game environments"""
-    num_steps: int = 128
+    num_steps: int = 256
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
@@ -50,15 +54,15 @@ class Args:
     """the discount factor gamma"""
     gae_lambda: float = 0.95
     """the lambda for the general advantage estimation"""
-    num_minibatches: int = 4
+    num_minibatches: int = 64
     """the number of mini-batches"""
-    update_epochs: int = 4
+    update_epochs: int = 16
     """the K epochs to update the policy"""
     norm_adv: bool = True
     """Toggles advantages normalization"""
     clip_coef: float = 0.2
     """the surrogate clipping coefficient"""
-    clip_vloss: bool = True
+    clip_vloss: bool = False
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
     ent_coef: float = 0.01
     """coefficient of the entropy"""
@@ -116,7 +120,7 @@ class Agent(nn.Module):
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01),
+            layer_init(nn.Linear(64, envs.single_action_space.n), std=1.0),
         )
 
     def get_value(self, x):
@@ -135,12 +139,13 @@ if __name__ == "__main__":
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
-    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+    run_name = (f"seed: {args.seed}, ent_coef: {args.ent_coef}, "
+            f"lr: {args.learning_rate}, lr_a: {args.anneal_lr}, "
+            f"update_epochs: {args.update_epochs}, clip_vloss: {args.clip_vloss}")
     if args.track:
         import wandb
-
         wandb.init(
-            project=args.wandb_project_name,
+            project=args.wandb_project_name + f"__{args.env_id}__{args.exp_name}_{args.tag}",
             entity=args.wandb_entity,
             sync_tensorboard=True,
             config=vars(args),
@@ -227,20 +232,29 @@ if __name__ == "__main__":
             ).to(device)
 
             if "final_info" in infos:
-                if isinstance(infos["final_info"], dict):
-                    infos["final_info"] = [infos["final_info"]]
-                for info in infos["final_info"]:
-                    if info and "episode" in info:
-                        print(
-                            f"global_step={global_step}, episodic_return={info['episode']['r']}"
-                        )
-                        writer.add_scalar(
-                            "charts/episodic_return", info["episode"]["r"], global_step
-                        )
-                        writer.add_scalar(
-                            "charts/episodic_length", info["episode"]["l"], global_step
-                        )
+                final_info = infos["final_info"]
 
+                # In recent Gymnasium vector + RecordEpisodeStatistics:
+                # final_info is usually a dict with stacked arrays + mask keys
+                if isinstance(final_info, dict) and "episode" in final_info:
+                    ep_dict = final_info["episode"]
+
+                    # Use the '_episode' or '_r' mask to find actually finished episodes
+                    if "_episode" in ep_dict:
+                        mask = ep_dict["_episode"]
+                    elif "_r" in ep_dict:
+                        mask = ep_dict["_r"]
+                    else:
+                        # fallback: any non-zero return (works for CartPole, less safe in general)
+                        mask = ep_dict["r"] != 0
+
+                    finished_r = ep_dict["r"][mask]
+                    finished_l = ep_dict["l"][mask]
+                    if len(finished_r) > 0:
+                        avg_return = np.mean(finished_r)
+                        avg_length = np.mean(finished_l)
+                        writer.add_scalar("charts/avg_episodic_return", avg_return, global_step)
+                        writer.add_scalar("charts/avg_episodic_length", avg_length, global_step)
         # bootstrap value if not done
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1)
@@ -346,7 +360,9 @@ if __name__ == "__main__":
         writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
         writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
-        print("SPS:", int(global_step / (time.time() - start_time)))
+        writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
+        writer.add_scalar("charts/wall_time", int(time.time() - start_time), global_step)   
+        print("SPS:", int(global_step / (time.time() - start_time))," iteration: ",iteration," global_step: ", global_step)
         writer.add_scalar(
             "charts/SPS", int(global_step / (time.time() - start_time)), global_step
         )
